@@ -1,0 +1,15 @@
+[project]
+name = "hexlet-code"
+version = "0.1.0"
+dependencies = [
+    "flask",
+    "python-dotenv",
+    "psycopg2-binary",
+    "requests",
+    "beautifulsoup4",
+    "validators"
+]
+
+[build-system]
+requires = ["uv>=0.1.0"]
+build-backend = "uv"
