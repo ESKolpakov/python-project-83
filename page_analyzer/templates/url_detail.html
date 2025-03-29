@@ -5,40 +5,40 @@
 {% block content %}
 <h1>Детали URL</h1>
 <ul class="list-group mb-3">
-  <li class="list-group-item"><strong>ID:</strong> {{ url.id }}</li>
-  <li class="list-group-item"><strong>URL:</strong> {{ url.name }}</li>
-  <li class="list-group-item"><strong>Дата добавления:</strong> {{ url.created_at }}</li>
+  <li class="list-group-item"><strong>ID:</strong> {{ url[0] }}</li>
+  <li class="list-group-item"><strong>URL:</strong> {{ url[1] }}</li>
+  <li class="list-group-item"><strong>Дата добавления:</strong> {{ url[2] }}</li>
 </ul>
 
-<form action="{{ url_for('check_url', url_id=url.id) }}" method="post" class="mb-3">
+<form action="{{ url_for('check_url', url_id=url[0]) }}" method="post" class="mb-3">
   <input type="submit" value="Запустить проверку" class="btn btn-primary w-100" />
 </form>
 
 {% if checks %}
-  <h2>Проверки</h2>
-  <table class="table" data-test="checks">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Код ответа</th>
-        <th>h1</th>
-        <th>Title</th>
-        <th>Description</th>
-        <th>Дата проверки</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for check in checks %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>{{ check.status_code }}</td>
-          <td>{{ check.h1 }}</td>
-          <td>{{ check.title }}</td>
-          <td>{{ check.description }}</td>
-          <td>{{ check.created_at }}</td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<h2>Проверки</h2>
+<table class="table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Код ответа</th>
+      <th>h1</th>
+      <th>Title</th>
+      <th>Description</th>
+      <th>Дата проверки</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for check in checks %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ check[0] }}</td>
+      <td>{{ check[1] }}</td>
+      <td>{{ check[2] }}</td>
+      <td>{{ check[3] }}</td>
+      <td>{{ check[4] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% endif %}
 {% endblock %}

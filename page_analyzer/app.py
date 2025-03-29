@@ -115,18 +115,24 @@ def list_urls():
 
 @app.route("/urls/<int:url_id>")
 def show_url(url_id):
-    """Отображает подробности конкретного URL."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT id, name, created_at FROM urls WHERE id = %s", (url_id,))
         url_data = cur.fetchone()
-
+        
         if url_data is None:
             flash("Страница не найдена", "error")
             cur.close()
             conn.close()
             return redirect(url_for("index"))
+        
+        # Преобразуем tuple в словарь
+        url_data = {
+            'id': url_data[0],
+            'name': url_data[1],
+            'created_at': url_data[2]
+        }
 
         cur.execute("""
             SELECT status_code, h1, title, description, created_at
@@ -135,13 +141,13 @@ def show_url(url_id):
             ORDER BY id DESC
         """, (url_id,))
         checks = cur.fetchall()
-
+        
         cur.close()
         conn.close()
     except Exception as e:
         flash(f"Ошибка при получении данных: {e}", "error")
         return redirect(url_for("index"))
-
+    
     return render_template("url_detail.html", url=url_data, checks=checks)
 
 

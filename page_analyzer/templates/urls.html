@@ -3,42 +3,31 @@
 {% block title %}Сайты{% endblock %}
 
 {% block content %}
-  <h1>Сайты</h1>
+<h1>Сайты</h1>
+<form action="{{ url_for('index') }}" method="post">
+  <input type="text" name="url" placeholder="Введите URL" required />
+  <button type="submit">Добавить сайт</button>
+</form>
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <ul class="alert-list">
-        {% for category, message in messages %}
-          <li class="alert alert-{{ category }}">{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
-
-  <table class="table" data-test="urls">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>URL</th>
-        <th>Дата добавления</th>
-        <th>Статус последней проверки</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for url in urls %}
-        <tr>
-          <td>{{ url.id }}</td>
-          <td>{{ url.name }}</td>
-          <td>{{ url.created_at }}</td>
-          <td>
-            {% if last_checks[url.id] %}
-              {{ last_checks[url.id].status_code }}
-            {% else %}
-              -
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<table class="table table-striped mt-4">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>URL</th>
+      <th>Последняя проверка</th>
+      <th>Код ответа</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for url in urls %}
+    <tr>
+      <td>{{ url[0] }}</td>
+      <td>{{ url[1] }}</td>
+      <td>{{ last_checks[url[0]].created_at if url[0] in last_checks else '-' }}</td>
+      <td>{{ last_checks[url[0]].status_code if url[0] in last_checks else '-' }}</td>
+      <td><a href="{{ url_for('show_url', url_id=url[0]) }}" class="btn btn-info">Детали</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% endblock %}
