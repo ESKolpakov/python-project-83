@@ -5,9 +5,7 @@ from urllib.parse import urlparse
 import requests
 import psycopg2
 from bs4 import BeautifulSoup
-from flask import (
-    Flask, render_template, request, redirect, flash, url_for
-)
+from flask import Flask, render_template, request, redirect, flash, url_for
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,11 +17,6 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 
 def normalize_url(url: str) -> str:
-    """
-    Нормализует URL, оставляя только схему и домен.
-    Например, 'http://page.com/blog/' и 'http://page.com/users/1'
-    станут 'http://page.com'
-    """
     try:
         parsed = urlparse(url)
         if not parsed.scheme or not parsed.netloc:
@@ -142,7 +135,7 @@ def check_url(url_id):
             return redirect(url_for("list_urls"))
         url = row[0]
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=3)
             response.raise_for_status()
             status_code = response.status_code
             soup = BeautifulSoup(response.text, "html.parser")
