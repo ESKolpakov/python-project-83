@@ -79,7 +79,6 @@ def index():
 
 @app.route("/urls")
 def list_urls():
-    """Отображает список всех URL."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -96,7 +95,6 @@ def list_urls():
             )
         """)
         checks_data = cur.fetchall()
-
         last_checks = {}
         for row in checks_data:
             url_id, status_code, created_at = row
@@ -111,6 +109,7 @@ def list_urls():
         flash(f"Ошибка при получении данных: {e}", "error")
         urls = []
         last_checks = {}
+
     return render_template("urls.html", urls=urls, last_checks=last_checks)
 
 
