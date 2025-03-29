@@ -11,11 +11,9 @@ from dotenv import load_dotenv
 # Загружаем переменные окружения
 load_dotenv()
 
-# Получаем URL базы данных и секретный ключ
 DATABASE_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY", "замени_на_настоящий_секрет")
 
-# Настроим Flask-приложение
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 
@@ -33,12 +31,8 @@ def normalize_url(url: str) -> str:
 
 def get_db_connection():
     """Создает подключение к базе данных."""
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        return conn
-    except psycopg2.Error as e:
-        print(f"Ошибка подключения к базе данных: {e}")
-        return None
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -54,12 +48,7 @@ def index():
             flash("URL превышает 255 символов", "error")
         else:
             try:
-                # Подключение к базе данных
                 conn = get_db_connection()
-                if conn is None:
-                    flash("Ошибка подключения к базе данных", "error")
-                    return redirect(url_for("index"))
-
                 cur = conn.cursor()
                 cur.execute("SELECT id FROM urls WHERE name = %s", (normalized,))
                 existing = cur.fetchone()
@@ -83,7 +72,6 @@ def index():
 
             except Exception as e:
                 flash(f"Ошибка при добавлении URL: {e}", "error")
-                print(f"Ошибка при добавлении URL: {e}")
                 return redirect(url_for("index"))
 
     return render_template("index.html")
@@ -94,10 +82,6 @@ def list_urls():
     """Отображает список всех URL."""
     try:
         conn = get_db_connection()
-        if conn is None:
-            flash("Ошибка подключения к базе данных", "error")
-            return redirect(url_for("index"))
-
         cur = conn.cursor()
         cur.execute("SELECT id, name, created_at FROM urls ORDER BY id DESC")
         urls = cur.fetchall()
@@ -135,10 +119,6 @@ def show_url(url_id):
     """Отображает подробности конкретного URL."""
     try:
         conn = get_db_connection()
-        if conn is None:
-            flash("Ошибка подключения к базе данных", "error")
-            return redirect(url_for("index"))
-
         cur = conn.cursor()
         cur.execute("SELECT id, name, created_at FROM urls WHERE id = %s", (url_id,))
         url_data = cur.fetchone()
@@ -171,10 +151,6 @@ def check_url(url_id):
     """Запускает проверку для конкретного URL."""
     try:
         conn = get_db_connection()
-        if conn is None:
-            flash("Ошибка подключения к базе данных", "error")
-            return redirect(url_for("list_urls"))
-
         cur = conn.cursor()
         cur.execute("SELECT name FROM urls WHERE id = %s", (url_id,))
         row = cur.fetchone()
