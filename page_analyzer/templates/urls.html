@@ -1,0 +1,48 @@
+<!-- page_analyzer/templates/urls.html -->
+{% extends "base.html" %}
+
+{% block title %}Сайты{% endblock %}
+
+{% block content %}
+<h1>Сайты</h1>
+<table class="table mt-3" data-test="urls">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Имя</th>
+      <th>Последняя проверка</th>
+      <th>Код ответа</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for id, name, created_at in urls %}
+      <tr data-test="url">
+        <td>{{ id }}</td>
+        <td>
+          <a href="{{ url_for('show_url', url_id=id) }}">
+            {{ name }}
+          </a>
+        </td>
+        <!-- Допустим, если хочешь вывести дату и статус последней проверки,
+             нужно хранить их в таблице urls или выполнять отдельный запрос. 
+             Можно расширить SQL-запрос, чтобы JOIN-ить последнюю проверку. -->
+        <td>
+          <!-- Допустим, если в контроллере уже приходит поле last_check_date -->
+          {% if last_checks and id in last_checks %}
+            {{ last_checks[id]['created_at'] }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          {% if last_checks and id in last_checks %}
+            {{ last_checks[id]['status_code'] }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

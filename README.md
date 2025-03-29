@@ -1,2 +1,37 @@
-### Hexlet tests and linter status:
-[![Actions Status](https://github.com/ESKolpakov/python-project-83/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/ESKolpakov/python-project-83/actions)
+# Анализатор страниц
+
+Проект "Анализатор страниц" — это веб-приложение, позволяющее добавлять URL, выполнять их проверку и проводить базовый SEO-анализ (извлечение тега h1, title и meta description). Приложение реализовано на Flask, использует PostgreSQL для хранения данных и BeautifulSoup для парсинга HTML.
+
+Сайт задеплоен на Render: [https://python-project-83-l4o8.onrender.com](https://python-project-83-l4o8.onrender.com)
+
+## Функционал
+
+- Добавление URL через форму
+- Сохранение URL в базе данных
+- Проверка доступности URL и получение HTTP-кода ответа
+- SEO-анализ страницы (извлечение h1, title и meta description)
+- Отображение списка добавленных URL и результатов проверок
+
+## Технологии
+
+- Python, Flask
+- PostgreSQL, psycopg2
+- BeautifulSoup, Requests
+- Bootstrap для оформления интерфейса
+
+## Запуск проекта
+
+1. Клонировать репозиторий:
+   ```bash
+   git clone https://github.com/ESKolpakov/python-project-83.git
+
+2. Установить зависимости:
+
+make install
+
+3. Запустить приложение в режиме разработки:
+
+make dev
+
+
+Дополнительные инструкции по деплою смотрите в файле build.sh.

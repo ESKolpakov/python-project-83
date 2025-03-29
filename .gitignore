@@ -1,12 +1,22 @@
+# Игнорировать виртуальное окружение
+.venv/
+
+# Игнорировать файлы окружения
 .env
+
+# Игнорировать файлы кэша Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-*.sqlite3
+*.py[cod]
+*$py.class
+
+# Игнорировать системные файлы
 .DS_Store
-.idea/
-.vscode/
+Thumbs.db
+
+# Игнорировать файлы логов
+*.log
+
+# Игнорировать файлы сборки
+build/
+dist/
+*.egg-info/
