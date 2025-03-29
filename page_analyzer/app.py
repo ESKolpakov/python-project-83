@@ -2,21 +2,26 @@ import os
 from datetime import datetime
 from urllib.parse import urlparse
 
-import requests
 import psycopg2
-from bs4 import BeautifulSoup
+import requests
 from flask import Flask, render_template, request, redirect, flash, url_for
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+# Загружаем переменные окружения
 load_dotenv()
 
+# Получаем URL базы данных и секретный ключ
 DATABASE_URL = os.getenv("DATABASE_URL")
 SECRET_KEY = os.getenv("SECRET_KEY", "замени_на_настоящий_секрет")
 
+# Настроим Flask-приложение
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 
+
 def normalize_url(url: str) -> str:
+    """Нормализует URL, проверяя схему и хост."""
     try:
         parsed = urlparse(url)
         if not parsed.scheme or not parsed.netloc:
@@ -25,30 +30,46 @@ def normalize_url(url: str) -> str:
     except Exception:
         return ""
 
+
 def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    """Создает подключение к базе данных."""
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    except psycopg2.Error as e:
+        print(f"Ошибка подключения к базе данных: {e}")
+        return None
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    """Обработчик главной страницы и добавления URL."""
     if request.method == "POST":
         url_input = request.form.get("url", "").strip()
         normalized = normalize_url(url_input)
+
         if not normalized:
             flash("Некорректный URL", "error")
         elif len(normalized) > 255:
             flash("URL превышает 255 символов", "error")
         else:
             try:
+                # Подключение к базе данных
                 conn = get_db_connection()
+                if conn is None:
+                    flash("Ошибка подключения к базе данных", "error")
+                    return redirect(url_for("index"))
+
                 cur = conn.cursor()
                 cur.execute("SELECT id FROM urls WHERE name = %s", (normalized,))
                 existing = cur.fetchone()
+
                 if existing:
                     flash("Страница уже существует", "info")
                     cur.close()
                     conn.close()
                     return redirect(url_for("show_url", url_id=existing[0]))
+
                 cur.execute(
                     "INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
                     (normalized, datetime.now())
@@ -59,17 +80,28 @@ def index():
                 cur.close()
                 conn.close()
                 return redirect(url_for("show_url", url_id=new_id))
+
             except Exception as e:
                 flash(f"Ошибка при добавлении URL: {e}", "error")
+                print(f"Ошибка при добавлении URL: {e}")
+                return redirect(url_for("index"))
+
     return render_template("index.html")
+
 
 @app.route("/urls")
 def list_urls():
+    """Отображает список всех URL."""
     try:
         conn = get_db_connection()
+        if conn is None:
+            flash("Ошибка подключения к базе данных", "error")
+            return redirect(url_for("index"))
+
         cur = conn.cursor()
         cur.execute("SELECT id, name, created_at FROM urls ORDER BY id DESC")
         urls = cur.fetchall()
+
         cur.execute("""
             SELECT url_id, status_code, created_at
             FROM url_checks
@@ -80,6 +112,7 @@ def list_urls():
             )
         """)
         checks_data = cur.fetchall()
+
         last_checks = {}
         for row in checks_data:
             url_id, status_code, created_at = row
@@ -87,6 +120,7 @@ def list_urls():
                 "status_code": status_code,
                 "created_at": created_at
             }
+
         cur.close()
         conn.close()
     except Exception as e:
@@ -95,18 +129,26 @@ def list_urls():
         last_checks = {}
     return render_template("urls.html", urls=urls, last_checks=last_checks)
 
+
 @app.route("/urls/<int:url_id>")
 def show_url(url_id):
+    """Отображает подробности конкретного URL."""
     try:
         conn = get_db_connection()
+        if conn is None:
+            flash("Ошибка подключения к базе данных", "error")
+            return redirect(url_for("index"))
+
         cur = conn.cursor()
         cur.execute("SELECT id, name, created_at FROM urls WHERE id = %s", (url_id,))
         url_data = cur.fetchone()
+
         if url_data is None:
             flash("Страница не найдена", "error")
             cur.close()
             conn.close()
             return redirect(url_for("index"))
+
         cur.execute("""
             SELECT status_code, h1, title, description, created_at
             FROM url_checks
@@ -114,25 +156,35 @@ def show_url(url_id):
             ORDER BY id DESC
         """, (url_id,))
         checks = cur.fetchall()
+
         cur.close()
         conn.close()
     except Exception as e:
         flash(f"Ошибка при получении данных: {e}", "error")
         return redirect(url_for("index"))
+
     return render_template("url_detail.html", url=url_data, checks=checks)
+
 
 @app.route("/urls/<int:url_id>/checks", methods=["POST"])
 def check_url(url_id):
+    """Запускает проверку для конкретного URL."""
     try:
         conn = get_db_connection()
+        if conn is None:
+            flash("Ошибка подключения к базе данных", "error")
+            return redirect(url_for("list_urls"))
+
         cur = conn.cursor()
         cur.execute("SELECT name FROM urls WHERE id = %s", (url_id,))
         row = cur.fetchone()
+
         if row is None:
             flash("Страница не найдена", "error")
             cur.close()
             conn.close()
             return redirect(url_for("list_urls"))
+
         url = row[0]
         try:
             response = requests.get(url, timeout=3)
@@ -143,11 +195,12 @@ def check_url(url_id):
             title = soup.title.get_text(strip=True) if soup.title else None
             meta_desc = soup.find("meta", attrs={"name": "description"})
             description = meta_desc["content"].strip() if meta_desc and meta_desc.get("content") else None
-        except Exception:
-            flash("Произошла ошибка при проверке", "error")
+        except requests.exceptions.RequestException as e:
+            flash(f"Произошла ошибка при проверке: {e}", "error")
             cur.close()
             conn.close()
             return redirect(url_for("show_url", url_id=url_id))
+
         cur.execute(
             """
             INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
@@ -161,7 +214,9 @@ def check_url(url_id):
         conn.close()
     except Exception as e:
         flash(f"Ошибка при проверке страницы: {e}", "error")
+
     return redirect(url_for("show_url", url_id=url_id))
 
+
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
