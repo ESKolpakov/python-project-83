@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 
 import requests
 import psycopg2
@@ -18,39 +18,26 @@ SECRET_KEY = os.getenv("SECRET_KEY", "замени_на_настоящий_се�
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 
-
 def normalize_url(url: str) -> str:
     """
-    Приводит URL к стандартному виду: схема и домен в нижнем регистре,
-    удаляет завершающий слэш, если он не является корневым.
+    Нормализует URL, оставляя только схему и домен.
+    Например, 'http://page.com/blog/' и 'http://page.com/users/1'
+    станут 'http://page.com'
     """
     try:
         parsed = urlparse(url)
-        if not parsed.scheme:
+        if not parsed.scheme or not parsed.netloc:
             return ""
-        scheme = parsed.scheme.lower()
-        netloc = parsed.netloc.lower()
-        path = parsed.path if parsed.path else "/"
-        if path != "/" and path.endswith("/"):
-            path = path.rstrip("/")
-        return urlunparse((scheme, netloc, path, parsed.params, parsed.query, parsed.fragment))
+        return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
     except Exception:
         return ""
 
-
 def get_db_connection():
-    """Устанавливает соединение с базой данных."""
     conn = psycopg2.connect(DATABASE_URL)
     return conn
 
-
 @app.route("/", methods=["GET", "POST"])
 def index():
-    """
-    Главная страница.
-    GET — отображает форму для ввода URL.
-    POST — обрабатывает добавление нового URL.
-    """
     if request.method == "POST":
         url_input = request.form.get("url", "").strip()
         normalized = normalize_url(url_input)
@@ -83,10 +70,8 @@ def index():
                 flash(f"Ошибка при добавлении URL: {e}", "error")
     return render_template("index.html")
 
-
 @app.route("/urls")
 def list_urls():
-    """Страница со списком добавленных URL."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -117,10 +102,8 @@ def list_urls():
         last_checks = {}
     return render_template("urls.html", urls=urls, last_checks=last_checks)
 
-
 @app.route("/urls/<int:url_id>")
 def show_url(url_id):
-    """Детальная страница URL и его проверок."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -145,10 +128,8 @@ def show_url(url_id):
         return redirect(url_for("index"))
     return render_template("url_detail.html", url=url_data, checks=checks)
 
-
 @app.route("/urls/<int:url_id>/checks", methods=["POST"])
 def check_url(url_id):
-    """Выполняет проверку URL и сохраняет SEO-данные."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -162,6 +143,7 @@ def check_url(url_id):
         url = row[0]
         try:
             response = requests.get(url, timeout=10)
+            response.raise_for_status()
             status_code = response.status_code
             soup = BeautifulSoup(response.text, "html.parser")
             h1 = soup.h1.get_text(strip=True) if soup.h1 else None
@@ -187,7 +169,6 @@ def check_url(url_id):
     except Exception as e:
         flash(f"Ошибка при проверке страницы: {e}", "error")
     return redirect(url_for("show_url", url_id=url_id))
-
 
 if __name__ == "__main__":
     app.run()

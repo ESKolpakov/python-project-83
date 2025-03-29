@@ -10,8 +10,8 @@
       <th>ID</th>
       <th>URL</th>
       <th>Дата добавления</th>
-      <th>Последняя проверка</th>
       <th>Код ответа</th>
+      <th>Последняя проверка</th>
     </tr>
   </thead>
   <tbody>
@@ -22,14 +22,14 @@
       <td>{{ created_at }}</td>
       <td>
         {% if last_checks and id in last_checks %}
-          {{ last_checks[id]['created_at'] }}
+          {{ last_checks[id]['status_code'] }}
         {% else %}
           —
         {% endif %}
       </td>
       <td>
         {% if last_checks and id in last_checks %}
-          {{ last_checks[id]['status_code'] }}
+          {{ last_checks[id]['created_at'] }}
         {% else %}
           —
         {% endif %}
