@@ -1,79 +1,167 @@
 import os
+from datetime import datetime
+from urllib.parse import urlparse
+
 import requests
-from flask import Flask, render_template, request, redirect, flash, url_for
-from flask_sqlalchemy import SQLAlchemy
+import psycopg2
 from bs4 import BeautifulSoup
+from flask import Flask, render_template, request, redirect, flash, url_for
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+SECRET_KEY = os.getenv("SECRET_KEY", "замени_на_настоящий_секрет")
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-db = SQLAlchemy(app)
+app.config["SECRET_KEY"] = SECRET_KEY
 
-class URL(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-    # связь с проверками
-    checks = db.relationship('URLCheck', backref='url', lazy=True)
-
-class URLCheck(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    url_id = db.Column(db.Integer, db.ForeignKey('url.id'), nullable=False)
-    status_code = db.Column(db.String(3))
-    h1 = db.Column(db.Text)
-    title = db.Column(db.Text)
-    description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/urls', methods=['GET', 'POST'])
-def urls():
-    if request.method == 'POST':
-        url_input = request.form.get('url')
-        # Простейшая валидация – URL должен начинаться с http:// или https://
-        if not url_input.startswith(('http://', 'https://')):
-            flash('Некорректный URL')
-            return redirect(url_for('index'))
-        # Нормализуем URL, удаляя завершающий слеш (если он есть)
-        normalized_url = url_input.rstrip('/')
-        # Проверяем наличие дубликата
-        existing_url = URL.query.filter_by(name=normalized_url).first()
-        if existing_url:
-            flash('Страница уже существует')
-        else:
-            new_url = URL(name=normalized_url)
-            db.session.add(new_url)
-            db.session.commit()
-            flash('Страница успешно добавлена')
-        return redirect(url_for('urls'))
-    all_urls = URL.query.all()
-    return render_template('urls.html', urls=all_urls)
-
-@app.route('/urls/<int:url_id>/checks', methods=['POST'])
-def check_url(url_id):
-    url_obj = URL.query.get_or_404(url_id)
+def normalize_url(url: str) -> str:
     try:
-        response = requests.get(url_obj.name, timeout=5)
-        status_code = str(response.status_code)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        h1 = soup.h1.get_text().strip() if soup.h1 else ''
-        title = soup.title.get_text().strip() if soup.title else ''
-        description = ''
-        desc_tag = soup.find('meta', attrs={'name': 'description'})
-        if desc_tag and desc_tag.get('content'):
-            description = desc_tag['content']
-        check = URLCheck(url_id=url_obj.id, status_code=status_code,
-                         h1=h1, title=title, description=description)
-        db.session.add(check)
-        db.session.commit()
-        flash('Страница успешно проверена')
-    except Exception as e:
-        flash('Произошла ошибка при проверке')
-    return redirect(url_for('urls'))
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return ""
+        return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+    except Exception:
+        return ""
 
-if __name__ == '__main__':
+def get_db_connection():
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        url_input = request.form.get("url", "").strip()
+        normalized = normalize_url(url_input)
+        if not normalized:
+            flash("Некорректный URL", "error")
+        elif len(normalized) > 255:
+            flash("URL превышает 255 символов", "error")
+        else:
+            try:
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT id FROM urls WHERE name = %s", (normalized,))
+                existing = cur.fetchone()
+                if existing:
+                    flash("Страница уже существует", "info")
+                    cur.close()
+                    conn.close()
+                    return redirect(url_for("show_url", url_id=existing[0]))
+                cur.execute(
+                    "INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
+                    (normalized, datetime.now())
+                )
+                new_id = cur.fetchone()[0]
+                conn.commit()
+                flash("Страница успешно добавлена", "success")
+                cur.close()
+                conn.close()
+                return redirect(url_for("show_url", url_id=new_id))
+            except Exception as e:
+                flash(f"Ошибка при добавлении URL: {e}", "error")
+    return render_template("index.html")
+
+@app.route("/urls")
+def list_urls():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, name, created_at FROM urls ORDER BY id DESC")
+        urls = cur.fetchall()
+        cur.execute("""
+            SELECT url_id, status_code, created_at
+            FROM url_checks
+            WHERE id IN (
+                SELECT MAX(id)
+                FROM url_checks
+                GROUP BY url_id
+            )
+        """)
+        checks_data = cur.fetchall()
+        last_checks = {}
+        for row in checks_data:
+            url_id, status_code, created_at = row
+            last_checks[url_id] = {
+                "status_code": status_code,
+                "created_at": created_at
+            }
+        cur.close()
+        conn.close()
+    except Exception as e:
+        flash(f"Ошибка при получении данных: {e}", "error")
+        urls = []
+        last_checks = {}
+    return render_template("urls.html", urls=urls, last_checks=last_checks)
+
+@app.route("/urls/<int:url_id>")
+def show_url(url_id):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, name, created_at FROM urls WHERE id = %s", (url_id,))
+        url_data = cur.fetchone()
+        if url_data is None:
+            flash("Страница не найдена", "error")
+            cur.close()
+            conn.close()
+            return redirect(url_for("index"))
+        cur.execute("""
+            SELECT status_code, h1, title, description, created_at
+            FROM url_checks
+            WHERE url_id = %s
+            ORDER BY id DESC
+        """, (url_id,))
+        checks = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        flash(f"Ошибка при получении данных: {e}", "error")
+        return redirect(url_for("index"))
+    return render_template("url_detail.html", url=url_data, checks=checks)
+
+@app.route("/urls/<int:url_id>/checks", methods=["POST"])
+def check_url(url_id):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM urls WHERE id = %s", (url_id,))
+        row = cur.fetchone()
+        if row is None:
+            flash("Страница не найдена", "error")
+            cur.close()
+            conn.close()
+            return redirect(url_for("list_urls"))
+        url = row[0]
+        try:
+            response = requests.get(url, timeout=3)
+            response.raise_for_status()
+            status_code = response.status_code
+            soup = BeautifulSoup(response.text, "html.parser")
+            h1 = soup.h1.get_text(strip=True) if soup.h1 else None
+            title = soup.title.get_text(strip=True) if soup.title else None
+            meta_desc = soup.find("meta", attrs={"name": "description"})
+            description = meta_desc["content"].strip() if meta_desc and meta_desc.get("content") else None
+        except Exception:
+            flash("Произошла ошибка при проверке", "error")
+            cur.close()
+            conn.close()
+            return redirect(url_for("show_url", url_id=url_id))
+        cur.execute(
+            """
+            INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (url_id, status_code, h1, title, description, datetime.now())
+        )
+        conn.commit()
+        flash("Страница успешно проверена", "success")
+        cur.close()
+        conn.close()
+    except Exception as e:
+        flash(f"Ошибка при проверке страницы: {e}", "error")
+    return redirect(url_for("show_url", url_id=url_id))
+
+if __name__ == "__main__":
     app.run()
