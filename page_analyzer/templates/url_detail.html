@@ -1,58 +1,42 @@
-<!-- page_analyzer/templates/url_detail.html -->
 {% extends "base.html" %}
 
 {% block title %}Детали URL{% endblock %}
 
 {% block content %}
-<h1>Сайт: {{ url[1] }}</h1>
-<table class="table mt-3">
-  <tbody>
-    <tr>
-      <td>ID</td>
-      <td>{{ url[0] }}</td>
-    </tr>
-    <tr>
-      <td>Имя</td>
-      <td>{{ url[1] }}</td>
-    </tr>
-    <tr>
-      <td>Дата создания</td>
-      <td>{{ url[2] }}</td>
-    </tr>
-  </tbody>
-</table>
-
-<h2>Проверки</h2>
-<form
-  action="{{ url_for('check_url', url_id=url[0]) }}"
-  method="post"
-  class="mb-3"
->
-  <button type="submit" class="btn btn-primary">Запустить проверку</button>
+<h1>Детали URL</h1>
+<ul class="list-group mb-3">
+  <li class="list-group-item"><strong>ID:</strong> {{ url[0] }}</li>
+  <li class="list-group-item"><strong>URL:</strong> {{ url[1] }}</li>
+  <li class="list-group-item"><strong>Дата добавления:</strong> {{ url[2] }}</li>
+</ul>
+<form action="{{ url_for('check_url', url_id=url[0]) }}" method="post" class="mb-3">
+  <input type="submit" value="Запустить проверку" class="btn btn-primary w-100" />
 </form>
-
+{% if checks %}
+<h2>Проверки</h2>
 <table class="table" data-test="checks">
   <thead>
     <tr>
-      <th>ID</th>
+      <th>#</th>
       <th>Код ответа</th>
       <th>h1</th>
-      <th>title</th>
-      <th>description</th>
-      <th>Дата создания</th>
+      <th>Title</th>
+      <th>Description</th>
+      <th>Дата проверки</th>
     </tr>
   </thead>
   <tbody>
     {% for check in checks %}
     <tr>
       <td>{{ loop.index }}</td>
-      <td>{{ check[0] }}</td> <!-- status_code -->
-      <td>{{ check[1] }}</td> <!-- h1 -->
-      <td>{{ check[2] }}</td> <!-- title -->
-      <td>{{ check[3] }}</td> <!-- description -->
-      <td>{{ check[4] }}</td> <!-- created_at -->
+      <td>{{ check[0] }}</td>
+      <td>{{ check[1] }}</td>
+      <td>{{ check[2] }}</td>
+      <td>{{ check[3] }}</td>
+      <td>{{ check[4] }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+{% endif %}
 {% endblock %}

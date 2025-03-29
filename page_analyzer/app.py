@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from urllib.parse import urlparse, urlunparse
 
 import requests
 import psycopg2
@@ -18,6 +19,25 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 
 
+def normalize_url(url: str) -> str:
+    """
+    Приводит URL к стандартному виду: схема и домен в нижнем регистре,
+    удаляет завершающий слэш, если он не является корневым.
+    """
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme:
+            return ""
+        scheme = parsed.scheme.lower()
+        netloc = parsed.netloc.lower()
+        path = parsed.path if parsed.path else "/"
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
+        return urlunparse((scheme, netloc, path, parsed.params, parsed.query, parsed.fragment))
+    except Exception:
+        return ""
+
+
 def get_db_connection():
     """Устанавливает соединение с базой данных."""
     conn = psycopg2.connect(DATABASE_URL)
@@ -27,32 +47,31 @@ def get_db_connection():
 @app.route("/", methods=["GET", "POST"])
 def index():
     """
-    Главная страница:
-    - GET: отображает форму для ввода URL
-    - POST: обрабатывает добавление нового URL
+    Главная страница.
+    GET — отображает форму для ввода URL.
+    POST — обрабатывает добавление нового URL.
     """
     if request.method == "POST":
-        url = request.form.get("url", "").strip()
-        if not url:
+        url_input = request.form.get("url", "").strip()
+        normalized = normalize_url(url_input)
+        if not normalized:
             flash("Некорректный URL", "error")
-        elif len(url) > 255:
+        elif len(normalized) > 255:
             flash("URL превышает 255 символов", "error")
         else:
             try:
                 conn = get_db_connection()
                 cur = conn.cursor()
-                # Проверяем, существует ли уже такой URL
-                cur.execute("SELECT id FROM urls WHERE name = %s", (url,))
+                cur.execute("SELECT id FROM urls WHERE name = %s", (normalized,))
                 existing = cur.fetchone()
                 if existing:
                     flash("Страница уже существует", "info")
                     cur.close()
                     conn.close()
                     return redirect(url_for("show_url", url_id=existing[0]))
-                # Добавляем URL
                 cur.execute(
                     "INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id",
-                    (url, datetime.now())
+                    (normalized, datetime.now())
                 )
                 new_id = cur.fetchone()[0]
                 conn.commit()
@@ -60,25 +79,19 @@ def index():
                 cur.close()
                 conn.close()
                 return redirect(url_for("show_url", url_id=new_id))
-            except Exception:
-                flash("Ошибка при добавлении URL", "error")
+            except Exception as e:
+                flash(f"Ошибка при добавлении URL: {e}", "error")
     return render_template("index.html")
 
 
 @app.route("/urls")
 def list_urls():
-    """
-    Страница со списком добавленных URL.
-    Для каждого URL выводится информация о последней проверке (если есть).
-    """
+    """Страница со списком добавленных URL."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        # Получаем список всех URL
         cur.execute("SELECT id, name, created_at FROM urls ORDER BY id DESC")
         urls = cur.fetchall()
-
-        # Получаем последнюю проверку для каждого URL через подзапрос
         cur.execute("""
             SELECT url_id, status_code, created_at
             FROM url_checks
@@ -89,7 +102,6 @@ def list_urls():
             )
         """)
         checks_data = cur.fetchall()
-        # Формируем словарь: last_checks[url_id] = {status_code, created_at}
         last_checks = {}
         for row in checks_data:
             url_id, status_code, created_at = row
@@ -99,8 +111,8 @@ def list_urls():
             }
         cur.close()
         conn.close()
-    except Exception:
-        flash("Ошибка при получении данных", "error")
+    except Exception as e:
+        flash(f"Ошибка при получении данных: {e}", "error")
         urls = []
         last_checks = {}
     return render_template("urls.html", urls=urls, last_checks=last_checks)
@@ -108,10 +120,7 @@ def list_urls():
 
 @app.route("/urls/<int:url_id>")
 def show_url(url_id):
-    """
-    Детальная страница для URL.
-    Отображает информацию о выбранном URL и список его проверок.
-    """
+    """Детальная страница URL и его проверок."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -131,18 +140,15 @@ def show_url(url_id):
         checks = cur.fetchall()
         cur.close()
         conn.close()
-    except Exception:
-        flash("Ошибка при получении данных", "error")
+    except Exception as e:
+        flash(f"Ошибка при получении данных: {e}", "error")
         return redirect(url_for("index"))
     return render_template("url_detail.html", url=url_data, checks=checks)
 
 
 @app.route("/urls/<int:url_id>/checks", methods=["POST"])
 def check_url(url_id):
-    """
-    Выполняет проверку URL, извлекает SEO-данные (h1, title, meta description)
-    и сохраняет результат в базу.
-    """
+    """Выполняет проверку URL и сохраняет SEO-данные."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -178,8 +184,8 @@ def check_url(url_id):
         flash("Страница успешно проверена", "success")
         cur.close()
         conn.close()
-    except Exception:
-        flash("Ошибка при проверке страницы", "error")
+    except Exception as e:
+        flash(f"Ошибка при проверке страницы: {e}", "error")
     return redirect(url_for("show_url", url_id=url_id))
 
 
