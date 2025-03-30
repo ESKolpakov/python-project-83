@@ -3,56 +3,54 @@
 {% block title %}Детали URL{% endblock %}
 
 {% block content %}
-<h1>Сайт: {{ url[1] }}</h1>
+<h1>Сайт: {{ url.name }}</h1>
 
 <div class="table-responsive">
   <table class="table table-bordered table-hover text-nowrap" data-test="url">
     <tbody>
       <tr>
         <td>ID</td>
-        <td>{{ url[0] }}</td>
+        <td>{{ url.id }}</td>
       </tr>
       <tr>
         <td>Имя</td>
-        <td>{{ url[1] }}</td>
+        <td>{{ url.name }}</td>
       </tr>
       <tr>
         <td>Дата создания</td>
-        <td>{{ url[2] }}</td>
+        <td>{{ url.created_at }}</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-<h2 class="mt-5 mb-3">Проверки</h2>
-<form method="post" action="{{ url_for('check_url', url_id=url[0]) }}">
-  <input type="submit" class="btn btn-primary" value="Запустить проверку">
+<form method="post" action="{{ url_for('check_url', id=url.id) }}">
+  <button type="submit" class="btn btn-primary">Запустить проверку</button>
 </form>
 
-<div>
-  <table class="table table-bordered table-hover mt-2" data-test="checks">
-    <thead>
+<h2 class="mt-5">Проверки</h2>
+<table class="table table-bordered table-hover" data-test="checks">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Код ответа</th>
+      <th>h1</th>
+      <th>title</th>
+      <th>description</th>
+      <th>Дата проверки</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for check in checks %}
       <tr>
-        <th>ID</th>
-        <th>Код ответа</th>
-        <th>h1</th>
-        <th>title</th>
-        <th>description</th>
-        <th>Дата создания</th>
+        <td>{{ check.id }}</td>
+        <td>{{ check.status_code }}</td>
+        <td>{{ check.h1 }}</td>
+        <td>{{ check.title }}</td>
+        <td>{{ check.description }}</td>
+        <td>{{ check.created_at }}</td>
       </tr>
-    </thead>
-    <tbody>
-      {% for line in checks %}
-      <tr>
-        <td>{{ line[0] }}</td>
-        <td>{{ line[1] }}</td>
-        <td>{{ line[2] }}</td>
-        <td>{{ line[3] }}</td>
-        <td>{{ line[4] }}</td>
-        <td>{{ line[5] }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+    {% endfor %}
+  </tbody>
+</table>
 {% endblock %}

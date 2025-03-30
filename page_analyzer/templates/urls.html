@@ -10,21 +10,21 @@
       <th>ID</th>
       <th>URL</th>
       <th>Дата добавления</th>
+      <th>Код ответа</th>
+      <th>Последняя проверка</th>
       <th>Действия</th>
     </tr>
   </thead>
   <tbody>
-    {% for site in urls %}
-    <tr>
-      <td>{{ site[0] }}</td>
-      <td>{{ site[1] }}</td>
-      <td>{{ site[2] }}</td>
-      <td>
-        <a class="btn btn-primary" href="{{ url_for('show_url', url_id=site[0]) }}">
-          Детали
-        </a>
-      </td>
-    </tr>
+    {% for url in urls %}
+      <tr>
+        <td>{{ url.id }}</td>
+        <td><a href="{{ url_for('url_detail', id=url.id) }}">{{ url.name }}</a></td>
+        <td>{{ url.created_at }}</td>
+        <td>{{ url.status_code or '' }}</td>
+        <td>{{ url.last_check or '' }}</td>
+        <td><a href="{{ url_for('url_detail', id=url.id) }}">Просмотреть</a></td>
+      </tr>
     {% endfor %}
   </tbody>
 </table>
