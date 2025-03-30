@@ -129,4 +129,3 @@ def check_url(id):
 
     flash('Страница успешно проверена', 'success')
     return redirect(url_for('url_detail', id=id))
-    
