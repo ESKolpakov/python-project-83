@@ -38,7 +38,7 @@ def index():
 
 @app.route('/urls', methods=['POST'])
 def add_url():
-    raw_url = request.form.get('url')
+    raw_url = request.form.get('url', '').strip()
     if not raw_url or not validators.url(raw_url) or len(raw_url) > 255:
         flash('Некорректный URL', 'danger')
         return render_template('index.html'), 422
@@ -67,7 +67,8 @@ def show_urls():
     with get_connection() as conn:
         with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
             curs.execute("""
-                SELECT urls.id, urls.name, MAX(url_checks.created_at) AS last_check,
+                SELECT urls.id, urls.name, urls.created_at,
+                       MAX(url_checks.created_at) AS last_check,
                        MAX(url_checks.status_code) AS status_code
                 FROM urls
                 LEFT JOIN url_checks ON urls.id = url_checks.url_id
@@ -114,8 +115,8 @@ def check_url(id):
 
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    h1 = soup.h1.string.strip() if soup.h1 and soup.h1.string else ''
-    title = soup.title.string.strip() if soup.title and soup.title.string else ''
+    h1 = soup.h1.get_text(strip=True) if soup.h1 else ''
+    title = soup.title.get_text(strip=True) if soup.title else ''
     description_tag = soup.find('meta', attrs={'name': 'description'})
     description = description_tag.get('content', '').strip() if description_tag else ''
 
@@ -128,3 +129,4 @@ def check_url(id):
 
     flash('Страница успешно проверена', 'success')
     return redirect(url_for('url_detail', id=id))
+    
