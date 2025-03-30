@@ -3,42 +3,56 @@
 {% block title %}Детали URL{% endblock %}
 
 {% block content %}
-<h1>Детали URL</h1>
-<ul class="list-group mb-3">
-  <li class="list-group-item"><strong>ID:</strong> {{ url[0] }}</li>
-  <li class="list-group-item"><strong>URL:</strong> {{ url[1] }}</li>
-  <li class="list-group-item"><strong>Дата добавления:</strong> {{ url[2] }}</li>
-</ul>
+<h1>Сайт: {{ url[1] }}</h1>
 
-<form action="{{ url_for('check_url', url_id=url[0]) }}" method="post" class="mb-3">
-  <input type="submit" value="Запустить проверку" class="btn btn-primary w-100" />
+<div class="table-responsive">
+  <table class="table table-bordered table-hover text-nowrap" data-test="url">
+    <tbody>
+      <tr>
+        <td>ID</td>
+        <td>{{ url[0] }}</td>
+      </tr>
+      <tr>
+        <td>Имя</td>
+        <td>{{ url[1] }}</td>
+      </tr>
+      <tr>
+        <td>Дата создания</td>
+        <td>{{ url[2] }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h2 class="mt-5 mb-3">Проверки</h2>
+<form method="post" action="{{ url_for('check_url', url_id=url[0]) }}">
+  <input type="submit" class="btn btn-primary" value="Запустить проверку">
 </form>
 
-{% if checks %}
-<h2>Проверки</h2>
-<table class="table">
-  <thead>
-    <tr>
-      <th>#</th>
-      <th>Код ответа</th>
-      <th>h1</th>
-      <th>Title</th>
-      <th>Description</th>
-      <th>Дата проверки</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for check in checks %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td>{{ check[0] }}</td>
-      <td>{{ check[1] }}</td>
-      <td>{{ check[2] }}</td>
-      <td>{{ check[3] }}</td>
-      <td>{{ check[4] }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endif %}
+<div>
+  <table class="table table-bordered table-hover mt-2" data-test="checks">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Код ответа</th>
+        <th>h1</th>
+        <th>title</th>
+        <th>description</th>
+        <th>Дата создания</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in checks %}
+      <tr>
+        <td>{{ line[0] }}</td>
+        <td>{{ line[1] }}</td>
+        <td>{{ line[2] }}</td>
+        <td>{{ line[3] }}</td>
+        <td>{{ line[4] }}</td>
+        <td>{{ line[5] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}

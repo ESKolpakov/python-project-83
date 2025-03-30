@@ -3,29 +3,27 @@
 {% block title %}Сайты{% endblock %}
 
 {% block content %}
-<h1>Сайты</h1>
-<form action="{{ url_for('index') }}" method="post">
-  <input type="text" name="url" placeholder="Введите URL" required />
-  <button type="submit">Добавить сайт</button>
-</form>
-
-<table class="table table-striped mt-4">
+<h1 class="mb-4">Сайты</h1>
+<table class="table table-bordered table-hover text-nowrap" data-test="urls">
   <thead>
     <tr>
       <th>ID</th>
       <th>URL</th>
-      <th>Последняя проверка</th>
-      <th>Код ответа</th>
+      <th>Дата добавления</th>
+      <th>Действия</th>
     </tr>
   </thead>
   <tbody>
-    {% for url in urls %}
+    {% for site in urls %}
     <tr>
-      <td>{{ url[0] }}</td>
-      <td>{{ url[1] }}</td>
-      <td>{{ last_checks[url[0]].created_at if url[0] in last_checks else '-' }}</td>
-      <td>{{ last_checks[url[0]].status_code if url[0] in last_checks else '-' }}</td>
-      <td><a href="{{ url_for('show_url', url_id=url[0]) }}" class="btn btn-info">Детали</a></td>
+      <td>{{ site[0] }}</td>
+      <td>{{ site[1] }}</td>
+      <td>{{ site[2] }}</td>
+      <td>
+        <a class="btn btn-primary" href="{{ url_for('show_url', url_id=site[0]) }}">
+          Детали
+        </a>
+      </td>
     </tr>
     {% endfor %}
   </tbody>
