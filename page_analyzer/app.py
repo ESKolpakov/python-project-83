@@ -2,84 +2,88 @@ import os
 import requests
 import validators
 import psycopg2
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from psycopg2.extras import NamedTupleCursor
 from urllib.parse import urlparse
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'secret-key')
 
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = os.getenv('DATABASE_URL', '')
 
 def get_connection():
     """Подключается к базе данных PostgreSQL."""
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    return psycopg2.connect(DATABASE_URL)
 
 def get_domain(url: str) -> str:
-    """Извлекает схему и домен из исходного URL."""
+    """Извлекает схему://домен из исходного URL."""
     parsed = urlparse(url)
     return '://'.join([parsed.scheme, parsed.netloc])
 
 def is_url_in_database(conn, url):
     """Проверяет, есть ли такой URL в таблице urls."""
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        sql_url = "SELECT COUNT(*) FROM public.urls WHERE name = %s;"
-        curs.execute(sql_url, (url,))
-        result = curs.fetchone()
-        return result.count > 0
+        curs.execute("SELECT COUNT(*) FROM urls WHERE name = %s;", (url,))
+        row = curs.fetchone()
+        return (row.count > 0)
 
 def insert_url(conn, url):
     """Добавляет новый URL в таблицу urls и возвращает его id."""
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        sql = """INSERT INTO public.urls (name, created_at)
-                 VALUES (%s, NOW()) RETURNING id;"""
-        curs.execute(sql, (url,))
-        result = curs.fetchone()
-        return result.id
+        curs.execute(
+            """INSERT INTO urls (name, created_at)
+               VALUES (%s, NOW()) RETURNING id;""",
+            (url,)
+        )
+        row = curs.fetchone()
+        return row.id
 
 def get_url(conn, action, value=None):
     """Возвращает данные из таблицы urls в зависимости от action."""
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
         if action == 'all':
-            sql_select = "SELECT id, name, created_at FROM public.urls ORDER BY id DESC;"
-            curs.execute(sql_select)
+            curs.execute("SELECT id, name, created_at FROM urls ORDER BY id DESC;")
             return curs.fetchall()
+
         elif action == 'site':
             _id = value
-            sql_site = "SELECT id, name, created_at FROM public.urls WHERE id = %s;"
-            curs.execute(sql_site, (_id,))
+            curs.execute("SELECT id, name, created_at FROM urls WHERE id = %s;", (_id,))
             return curs.fetchone()
-        elif action == 'id':
-            url = value
-            sql_url = "SELECT id FROM public.urls WHERE name = %s;"
-            curs.execute(sql_url, (url,))
-            res = curs.fetchone()
-            return res.id if res else None
-        elif action == 'domain':
-            _id = value
-            sql_dom = "SELECT name FROM public.urls WHERE id = %s;"
-            curs.execute(sql_dom, (_id,))
-            res = curs.fetchone()
-            return res.name if res else None
 
-def get_url_check_result(conn, url_id):
+        elif action == 'id':
+            # По названию url (строка) вернуть его id
+            url_str = value
+            curs.execute("SELECT id FROM urls WHERE name = %s;", (url_str,))
+            row = curs.fetchone()
+            return row.id if row else None
+
+        elif action == 'domain':
+            # По id вернуть domain (полный url из поля name)
+            _id = value
+            curs.execute("SELECT name FROM urls WHERE id = %s;", (_id,))
+            row = curs.fetchone()
+            return row.name if row else None
+
+def get_url_checks(conn, url_id):
     """Возвращает список проверок для указанного URL (url_id)."""
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        sql = """SELECT id, status_code, h1, title, description, created_at
-                 FROM public.url_checks
-                 WHERE url_id = %s
-                 ORDER BY id DESC;"""
-        curs.execute(sql, (url_id,))
+        curs.execute(
+            """SELECT id, status_code, h1, title, description, created_at
+               FROM url_checks
+               WHERE url_id = %s
+               ORDER BY id DESC;""",
+            (url_id,)
+        )
         return curs.fetchall()
 
-def insert_check_result_with_id_url(conn, url_id, status_code, h1, title, description):
+def insert_url_check(conn, url_id, status_code, h1, title, description):
     """Сохраняет результат проверки (url_checks)."""
     with conn.cursor() as curs:
-        sql = """INSERT INTO public.url_checks
-                 (url_id, status_code, h1, title, description, created_at)
-                 VALUES (%s, %s, %s, %s, %s, NOW())"""
-        curs.execute(sql, (url_id, status_code, h1, title, description))
+        curs.execute(
+            """INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
+               VALUES (%s, %s, %s, %s, %s, NOW())""",
+            (url_id, status_code, h1, title, description)
+        )
 
 def url_parser(response):
     """Парсит ответ (response) и возвращает (status_code, h1, title, description)."""
@@ -87,95 +91,108 @@ def url_parser(response):
     soup = BeautifulSoup(response.text, 'html.parser')
     h1 = soup.h1.get_text(strip=True) if soup.h1 else ''
     title = soup.title.get_text(strip=True) if soup.title else ''
-    description = ''
+    desc = ''
     meta_desc = soup.find("meta", attrs={"name": "description"})
     if meta_desc and meta_desc.get("content"):
-        description = meta_desc["content"].strip()
-    return response.status_code, h1, title, description
+        desc = meta_desc["content"].strip()
+    return response.status_code, h1, title, desc
 
-@app.errorhandler(404)
-def no_page(error):
-    flash("Страница не найдена", "danger")
-    return redirect(url_for('index'))
+# ---------- ROUTES ----------
 
 @app.route('/')
 def index():
-    """Главная страница (форма добавления URL)."""
+    """Главная страница с формой."""
     return render_template('index.html')
 
 @app.route('/urls', methods=['GET', 'POST'])
 def list_urls():
-    """Отображение списка всех URL (GET) и добавление нового URL (POST)."""
+    """Если GET — показывает список. Если POST — пытается добавить URL."""
     if request.method == 'POST':
-        url_input = request.form.get('url', '').strip()
-        if not url_input:
-            flash('Некорректный URL', 'danger')
-            return render_template('index.html', value=url_input), 422
+        url_raw = request.form.get('url', '').strip()
+        if not url_raw:
+            return render_template(
+                'index.html',
+                value=url_raw,
+                error="Некорректный URL (пустая строка)"
+            ), 422
 
-        # Нормализуем URL, валидируем
-        normalized = get_domain(url_input)
+        normalized = get_domain(url_raw)
         if not validators.url(normalized) or len(normalized) > 255:
-            flash('Некорректный URL', 'danger')
-            return render_template('index.html', value=url_input), 422
+            return render_template(
+                'index.html',
+                value=url_raw,
+                error="Некорректный URL"
+            ), 422
 
         conn = get_connection()
         try:
             if is_url_in_database(conn, normalized):
-                flash("Страница уже существует", "info")
-                url_id = get_url(conn, 'id', normalized)
-            else:
-                url_id = insert_url(conn, normalized)
-                flash("Страница успешно добавлена", "success")
+                return render_template(
+                    'index.html',
+                    value=url_raw,
+                    info="Страница уже существует"
+                ), 200
+            new_id = insert_url(conn, normalized)
         finally:
             conn.close()
 
-        return redirect(url_for('show_url', url_id=url_id))
+        return render_template(
+            'index.html',
+            success="Страница успешно добавлена",
+            new_id=new_id
+        ), 200
 
-    # Если GET — показываем список
+    # Если GET
     conn = get_connection()
     try:
         urls = get_url(conn, 'all')
     finally:
         conn.close()
 
-    # для упрощения просто рендерим urls.html
     return render_template('urls.html', urls=urls)
 
 @app.route('/urls/<int:url_id>')
 def show_url(url_id):
-    """Страница деталей одного URL."""
+    """Показываем детали одного URL, если он существует."""
     conn = get_connection()
     try:
-        url_data = get_url(conn, 'site', url_id)
-        if not url_data:
-            flash("Страница не найдена", "danger")
-            return redirect(url_for('list_urls'))
+        row = get_url(conn, 'site', url_id)
+        if not row:
+            return render_template('urls.html', error="Страница не найдена"), 404
 
-        checks = get_url_check_result(conn, url_id)
+        checks = get_url_checks(conn, url_id)
+        return render_template('url_detail.html', url=row, checks=checks)
     finally:
         conn.close()
 
-    return render_template('url_detail.html', url=url_data, checks=checks)
-
 @app.route('/urls/<int:url_id>/checks', methods=['POST'])
 def check_url(url_id):
-    """Запускает проверку для указанного URL (url_id)."""
+    """Запускаем проверку URL: делаем HTTP-запрос, парсим, сохраняем результат."""
     conn = get_connection()
     try:
         domain = get_url(conn, 'domain', url_id)
         if not domain:
-            flash("Страница не найдена", "danger")
-            return redirect(url_for('list_urls'))
+            return render_template('urls.html', error="Страница не найдена"), 404
 
         try:
-            response = requests.get(domain, timeout=3)
-            response.raise_for_status()
-            status_code, h1, title, description = url_parser(response)
-            insert_check_result_with_id_url(conn, url_id, status_code, h1, title, description)
-            flash("Страница успешно проверена", "success")
-        except requests.exceptions.RequestException:
-            flash("Произошла ошибка при проверке", "danger")
+            resp = requests.get(domain, timeout=3)
+            resp.raise_for_status()
+            code, h1, title, desc = url_parser(resp)
+            insert_url_check(conn, url_id, code, h1, title, desc)
+            return render_template(
+                'urls.html',
+                success="Страница успешно проверена",
+            ), 200
+        except requests.RequestException:
+            # Сетевая ошибка/таймаут/код 4xx/5xx
+            return render_template(
+                'urls.html',
+                error="Произошла ошибка при проверке"
+            ), 522
     finally:
         conn.close()
 
-    return redirect(url_for('show_url', url_id=url_id))
+@app.errorhandler(404)
+def not_found(e):
+    """На случай, если вы хотите глобально обработать 404."""
+    return render_template('urls.html', error="Страница не найдена"), 404
