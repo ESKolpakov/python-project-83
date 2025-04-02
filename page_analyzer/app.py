@@ -121,10 +121,14 @@ def check_url(id):
 
         with get_connection() as conn:
             with conn.cursor() as curs:
-                curs.execute("""
-                    INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s);
-                """, (id, status_code, h1, title, description, datetime.now()))
+                curs.execute(
+                """
+                INSERT INTO url_checks (
+                    url_id, status_code, h1, title, description, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s);
+                """,
+                (id, status_code, h1, title, description, datetime.now())
+            )
 
         flash('Страница успешно проверена', 'success')
         return redirect(url_for('url_detail', id=id))
