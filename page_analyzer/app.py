@@ -66,14 +66,17 @@ def add_url():
 
     with get_connection() as conn:
         with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-            curs.execute("SELECT id FROM urls WHERE name = %s;", (normalized_url,))
+            curs.execute(
+                "SELECT id FROM urls WHERE name = %s;", (normalized_url,)
+                )
             existing = curs.fetchone()
             if existing:
                 flash('Страница уже существует', 'info')
                 return redirect(url_for('url_detail', id=existing.id))
 
             curs.execute(
-                "INSERT INTO urls (name, created_at) VALUES (%s, %s) RETURNING id;",
+                """INSERT INTO urls (name, created_at)
+                VALUES (%s, %s) RETURNING id;""",
                 (normalized_url, datetime.now())
             )
             new_id = curs.fetchone().id
