@@ -49,9 +49,14 @@ def index():
 @app.route('/urls', methods=['POST'])
 def add_url():
     raw_url = request.form.get('url', '').strip()
-    if not raw_url or not validators.url(raw_url) or len(raw_url) > 255:
+
+    # Проверка вручную на scheme + netloc, чтобы отловить кривые урлы вроде "httpsss://"
+    parsed = urlparse(raw_url)
+    is_valid = validators.url(raw_url) and parsed.scheme in ('http', 'https') and parsed.netloc and len(raw_url) <= 255
+
+    if not raw_url or not is_valid:
         flash('Некорректный URL', 'danger')
-        return render_template('index.html'), 422
+        return render_template('index.html', input_url=raw_url), 422
 
     normalized_url = normalize_url(raw_url)
 
@@ -70,8 +75,6 @@ def add_url():
             new_id = curs.fetchone().id
             flash('Страница успешно добавлена', 'success')
             return redirect(url_for('url_detail', id=new_id))
-
-
 @app.route('/urls')
 def show_urls():
     with get_connection() as conn:
