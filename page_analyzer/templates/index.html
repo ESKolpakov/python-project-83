@@ -11,7 +11,7 @@
     <form action="{{ url_for('add_url') }}" method="POST">
       <div class="input-group input-group-lg">
         <input type="text" class="form-control" name="url" placeholder="https://www.example.com" required value="{{ input_url | default('') }}">
-        <button class="btn btn-primary btn-lg" type="submit">Проверить</button>
+        <input type="submit" class="btn btn-primary btn-lg" value="Проверить">
       </div>
     </form>
   </div>
