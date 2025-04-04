@@ -1,0 +1,25 @@
+version: '2'
+checks:
+  argument-count:
+    config:
+      threshold: 5
+
+engines:
+  duplication:
+    enabled: true
+  pep8:
+    enabled: true
+  radon:
+    enabled: true
+    config:
+      complexity:
+        threshold: 10
+
+ratings:
+  paths:
+    - "**.py"
+
+exclude_paths:
+  - "tests/"
+  - "venv/"
+  - "__pycache__/"
